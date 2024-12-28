@@ -11,24 +11,22 @@ import logging
 import joblib
 from typing import List
 
-# Configuración básica del logger
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 app = FastAPI()
 
-# Configuración de CORS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite solicitudes desde tu frontend Angular
+    allow_origins=["*"], 
     allow_credentials=True,
-    allow_methods=["*"],  # Permite todos los métodos (GET, POST, etc.)
-    allow_headers=["*"],  # Permite todos los encabezados
+    allow_methods=["*"], 
+    allow_headers=["*"],  
 )
 
 UPLOAD_FOLDER = "./uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Cargar el modelo y el escalador
 model = joblib.load('parkinson_model.pkl')
 scaler = joblib.load('scaler.pkl')
 
@@ -62,7 +60,7 @@ def analyze_semantics(file_path):
         raise HTTPException(status_code=500, detail=str(e))
 
 def extract_audio_features(file_path):
-    """Extrae las características acústicas del audio."""
+
     try:
         logging.info("Cargando archivo de audio...")
         y, sr = librosa.load(file_path, sr=None)
@@ -82,7 +80,7 @@ def extract_audio_features(file_path):
         rms = librosa.feature.rms(y=y)[0]
         shimmer = np.std(rms) / np.mean(rms) if np.mean(rms) else 0
 
-        # Escalar las características y predecir
+
         try:
             features = scaler.transform([[meanF0, jitter, jitter_abs, shimmer]])
             prediction = model.predict(features)[0]
@@ -102,25 +100,25 @@ async def audios_analizar(audios: List[UploadFile] = File(...)):
     resultados = []
     for audio in audios:
 
-    # Guardar el archivo temporalmente
+
         file_path = os.path.join(UPLOAD_FOLDER, audio.filename)
         with open(file_path, "wb") as buffer:
             buffer.write(await audio.read())
 
         try:
-            # Procesar el audio: Análisis semántico
+
             logging.info("Iniciando análisi semántico...")
             start_time_semantic = time.time()
             texto_transcrito, similitud, clasificacion = analyze_semantics(file_path)
             semantic_execution_time = time.time() - start_time_semantic
 
-            # Procesar el audio: Extracción de características
+
             logging.info("Iniciando extracción de características...")
             start_time_features = time.time()
             meanF0, jitter, jitter_abs, shimmer, prediction = extract_audio_features(file_path)
             features_execution_time = time.time() - start_time_features
 
-            # Tiempo total de ejecución
+
             execution_time = semantic_execution_time + features_execution_time
             resultados.append({
             "filename": audio.filename,
@@ -137,10 +135,8 @@ async def audios_analizar(audios: List[UploadFile] = File(...)):
             "execution_time": execution_time
             })
         finally:
-            # Eliminar el archivo temporal
+
             os.remove(file_path)
 
-        # Respuesta JSON plana con las métricas adicionales
+
     return JSONResponse(content={"resultados": resultados})
-
-
